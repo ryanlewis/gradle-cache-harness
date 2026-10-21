@@ -25,3 +25,5 @@ find "$guh" -maxdepth 2 -type f -not -path '*/caches/*' 2>/dev/null | sort
 
 echo "-- project .gradle (KiB)"
 du -sk "$proj"/* 2>/dev/null | sort -rn
+
+exit 0

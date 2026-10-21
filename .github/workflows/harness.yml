@@ -1,0 +1,102 @@
+name: harness
+
+on:
+  push:
+    branches: [main]
+    paths: [scenario]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness
+
+env:
+  NIA_SHA: 2982e63cb691ad49cd009aab43dc206fee6699c2
+  GRADLE_BUILD_ACTION_CACHE_DEBUG_ENABLED: "true"
+
+jobs:
+  build:
+    name: build (${{ matrix.provider }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [enhanced, basic, v5]
+    env:
+      # Keeps the providers' cache entries apart where the provider honours it
+      GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: ${{ matrix.provider }}-
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # Its post step runs after setup-gradle's, so it sees the save phase
+      - name: Start observer
+        uses: ./.github/actions/observe
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: android/nowinandroid
+          ref: ${{ env.NIA_SHA }}
+          path: nia
+          persist-credentials: false
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Apply scenario
+        run: scripts/apply-scenario.sh "$(cut -d' ' -f1 scenario)" nia
+
+      - name: Setup Gradle (v6 enhanced)
+        if: matrix.provider == 'enhanced'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Setup Gradle (v6 basic)
+        if: matrix.provider == 'basic'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Setup Gradle (v5)
+        if: matrix.provider == 'v5'
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Snapshot after restore
+        run: scripts/snapshot.sh after-restore
+
+      - name: CI Gradle properties
+        run: cp nia/.github/ci-gradle.properties ~/.gradle/gradle.properties
+
+      - name: Configure
+        working-directory: nia
+        run: ./gradlew help --console=plain
+
+      - name: Build
+        working-directory: nia
+        run: ./gradlew :app:assembleDemoDebug -PminifyWithR8=false --console=plain
+
+      - name: Snapshot after build
+        run: scripts/snapshot.sh after-build
+
+  caches:
+    needs: build
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+    steps:
+      - name: List cache entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | [.key, .size_in_bytes, .ref, .created_at, .last_accessed_at] | @tsv'

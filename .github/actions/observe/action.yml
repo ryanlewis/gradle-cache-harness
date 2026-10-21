@@ -1,0 +1,7 @@
+name: observe
+description: Record DNS lookups and new TCP connections for the whole job, and snapshot Gradle User Home after every other post step.
+runs:
+  using: node24
+  main: main.js
+  post: post.js
+  post-if: always()

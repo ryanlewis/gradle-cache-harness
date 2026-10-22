@@ -33,4 +33,5 @@ mkdir -p "$out"
 gh run view "$run" --json conclusion,jobs > "$out/run.json"
 gh run view "$run" --log > "$out/log.txt"
 echo "$run" > "$out/run-id"
+gh run download "$run" -D "$out/artifacts" || true
 echo "$out (run $run, $(jq -r .conclusion "$out/run.json"))"

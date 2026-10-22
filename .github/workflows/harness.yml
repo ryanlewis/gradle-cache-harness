@@ -92,7 +92,8 @@ jobs:
           key: android-task-store-e${{ env.CACHE_EPOCH }}-${{ github.sha }}
           restore-keys: android-task-store-e${{ env.CACHE_EPOCH }}-
 
-      # The included build's outputs, so the first Gradle call can pass the configuration cache fingerprint check
+      # Project state outside Gradle User Home that the configuration cache fingerprint checks: the included build's
+      # outputs and a directory the build generates inside the source tree
       - name: Restore build-logic outputs (sim)
         if: matrix.provider == 'sim'
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -100,7 +101,8 @@ jobs:
           path: |
             nia/build-logic/convention/build
             nia/build-logic/.gradle
-          key: android-build-logic-e${{ env.CACHE_EPOCH }}-${{ env.ImageVersion }}-${{ hashFiles('nia/build-logic/**/*.kts', 'nia/build-logic/**/src/**', 'nia/gradle/libs.versions.toml', 'nia/gradle/wrapper/gradle-wrapper.properties') }}
+            nia/app/src/demoRelease/generated
+          key: android-project-state-e${{ env.CACHE_EPOCH }}-${{ env.ImageVersion }}-${{ hashFiles('nia/build-logic/**/*.kts', 'nia/build-logic/**/src/**', 'nia/gradle/libs.versions.toml', 'nia/gradle/wrapper/gradle-wrapper.properties') }}
 
       - name: Point the build cache at the task output store (sim)
         if: matrix.provider == 'sim'

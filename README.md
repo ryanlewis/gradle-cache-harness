@@ -1,6 +1,6 @@
 # gradle-cache-harness
 
-Measures Gradle caching on GitHub Actions: the providers in [`gradle/actions/setup-gradle`](https://github.com/gradle/actions), and variants that model parts of a design built on S3. Each runs against the same pinned builds.
+Measures Gradle caching on GitHub Actions: the providers in [`gradle/actions/setup-gradle`](https://github.com/gradle/actions), and variants that model parts of the ideal design described in [gradle-ci-caching](https://github.com/ryanlewis/gradle-ci-caching). Each runs against the same pinned builds.
 
 Every provider is observed from outside only:
 - step timings;

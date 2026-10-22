@@ -1,0 +1,152 @@
+name: spring
+
+on:
+  push:
+    branches: [main]
+    paths: [scenario-spring]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spring
+
+env:
+  APP_REPO: conductor-oss/conductor
+  APP_SHA: 4ed6f796b1530f0587ede8f2d1fd898de170a914
+  PROJECT_DIR: app
+  GRADLE_BUILD_ACTION_CACHE_DEBUG_ENABLED: "true"
+
+jobs:
+  build:
+    name: build (${{ matrix.provider }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [enhanced, basic, v5, v5rc]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # Its post step runs after setup-gradle's, so it sees the save phase
+      - name: Start observer
+        uses: ./.github/actions/observe
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: ${{ env.APP_REPO }}
+          ref: ${{ env.APP_SHA }}
+          path: app
+          persist-credentials: false
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # A cold run bumps the epoch, which gives every provider a fresh key space without deleting entries
+      - name: Read scenario
+        run: |
+          read -r s n e < scenario-spring
+          e="${e:-0}"
+          {
+            echo "SCENARIO=$s"
+            echo "RUN=$n"
+            echo "CACHE_EPOCH=$e"
+            echo "GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX=spring-e$e-${{ matrix.provider }}-"
+          } >> "$GITHUB_ENV"
+          # Basic keys on build files only; this file puts the suite and epoch into its key
+          mkdir -p epoch && echo "suite=spring epoch=$e" > epoch/versions.properties
+
+      - name: Apply scenario
+        run: scripts/apply-scenario-spring.sh "$SCENARIO" app "$RUN"
+
+      - name: Setup Gradle (v6 enhanced)
+        if: matrix.provider == 'enhanced'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Setup Gradle (v6 basic)
+        if: matrix.provider == 'basic'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Setup Gradle (v5)
+        if: matrix.provider == 'v5' || matrix.provider == 'v5rc'
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          gradle-home-cache-excludes: ${{ matrix.provider == 'v5rc' && 'caches/build-cache-1' || '' }}
+
+      # v5rc: task outputs go to a separate store that is never cleaned per job, standing in for a remote build cache
+      - name: Restore task output store (v5rc)
+        if: matrix.provider == 'v5rc'
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/task-store
+          key: spring-task-store-e${{ env.CACHE_EPOCH }}-${{ github.sha }}
+          restore-keys: spring-task-store-e${{ env.CACHE_EPOCH }}-
+
+      - name: Point the build cache at the task output store (v5rc)
+        if: matrix.provider == 'v5rc'
+        run: |
+          mkdir -p ~/.gradle/init.d /tmp/task-store
+          cat > ~/.gradle/init.d/task-store.init.gradle <<'GRADLE'
+          beforeSettings { settings ->
+              settings.buildCache { local { directory = new File('/tmp/task-store') } }
+          }
+          GRADLE
+          du -sh /tmp/task-store
+
+      - name: Snapshot after restore
+        run: |
+          scripts/snapshot.sh after-restore
+          scripts/delta.sh record
+
+      - name: Configure
+        working-directory: app
+        run: ./gradlew help --console=plain -Dorg.gradle.internal.operations.trace=/tmp/optrace/configure
+
+      - name: Build
+        working-directory: app
+        run: ./gradlew build -x test --console=plain -Dorg.gradle.internal.operations.trace=/tmp/optrace/build
+
+      - name: Test
+        working-directory: app
+        continue-on-error: true
+        run: ./gradlew :conductor-common:test :conductor-core:test --console=plain -Dorg.gradle.internal.operations.trace=/tmp/optrace/test
+
+      - name: Snapshot after build
+        run: |
+          scripts/snapshot.sh after-build
+          scripts/delta.sh compare
+
+      - name: Upload build operation traces
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: optrace-${{ matrix.provider }}
+          path: /tmp/optrace/
+          compression-level: 9
+          retention-days: 14
+          if-no-files-found: warn
+
+  caches:
+    needs: build
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+    steps:
+      - name: List cache entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | [.key, .size_in_bytes, .ref, .created_at, .last_accessed_at] | @tsv'

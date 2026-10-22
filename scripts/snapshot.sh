@@ -4,7 +4,7 @@ set -uo pipefail
 
 label="$1"
 guh="${GRADLE_USER_HOME:-$HOME/.gradle}"
-proj="$GITHUB_WORKSPACE/nia/.gradle"
+proj="$GITHUB_WORKSPACE/${PROJECT_DIR:-nia}/.gradle"
 
 echo "### snapshot $label $(date -u +%FT%T)"
 if [ ! -d "$guh" ]; then

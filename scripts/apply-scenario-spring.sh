@@ -3,7 +3,7 @@
 #   cold, warm  no change
 #   buildfile   comment added to server/build.gradle
 #   depbump     one library version changed in dependencies.gradle
-#   srcedit     a string literal changed in one Java class in core, different on every run
+#   srcedit     an unused constant added to one Java class in core, different on every run
 # A "+conv" suffix (e.g. warm+conv) also applies build conventions: parallel execution and configuration cache.
 set -euo pipefail
 
@@ -29,10 +29,10 @@ case "$scenario" in
     grep -q "revCommonsIo = '2.19.0'" "$dir/dependencies.gradle"
     ;;
   srcedit)
-    # Changes a string literal, so the class file changes and the formatter has nothing to object to
+    # Adds an unused constant: the class file changes, the formatter accepts it and no test can see it
     f="$dir/core/src/main/java/com/netflix/conductor/core/utils/DateTimeUtils.java"
-    sed -i "s/\"Not valid duration: \"/\"Not valid duration#$run: \"/" "$f"
-    grep -q "Not valid duration#$run: " "$f"
+    sed -i "s/^public class DateTimeUtils {$/public class DateTimeUtils {\n\n    private static final int HARNESS_MARKER = $run;/" "$f"
+    grep -q "HARNESS_MARKER = $run;" "$f"
     ;;
   *)
     echo "unknown scenario: $scenario" >&2

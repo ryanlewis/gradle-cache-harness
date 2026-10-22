@@ -55,6 +55,8 @@ jobs:
             echo "RUN=$n"
             echo "CACHE_EPOCH=$e"
             echo "GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX=android-e$e-${{ matrix.provider }}-"
+            # Gradle's configuration cache checks os.version, the kernel release on Linux
+            echo "KERNEL=$(uname -r)"
           } >> "$GITHUB_ENV"
           # Basic keys on build files only; this file puts the suite and epoch into its key
           mkdir -p epoch && echo "suite=android epoch=$e" > epoch/versions.properties
@@ -103,7 +105,7 @@ jobs:
             nia/build-logic/.gradle
             nia/*/src/*/generated
             nia/*/*/src/*/generated
-          key: android-project-state2-e${{ env.CACHE_EPOCH }}-${{ env.ImageVersion }}-${{ hashFiles('nia/build-logic/**/*.kts', 'nia/build-logic/**/src/**', 'nia/gradle/libs.versions.toml', 'nia/gradle/wrapper/gradle-wrapper.properties') }}
+          key: android-project-state3-e${{ env.CACHE_EPOCH }}-${{ env.KERNEL }}-${{ hashFiles('nia/build-logic/**/*.kts', 'nia/build-logic/**/src/**', 'nia/gradle/libs.versions.toml', 'nia/gradle/wrapper/gradle-wrapper.properties') }}
 
       - name: Point the build cache at the task output store (sim)
         if: matrix.provider == 'sim'

@@ -25,7 +25,7 @@ No provider code is unpacked or modified.
 | `enhanced` | setup-gradle v6, default provider (closed-source `gradle-actions-caching`) |
 | `basic` | setup-gradle v6, `cache-provider: basic` |
 | `v5` | setup-gradle v5.0.2, the last release with open-source fine-grained caching |
-| `sim` (android) | v5, plus task outputs in a separate store that is never cleaned per job, plus project state (`build-logic` outputs, `src/*/generated`) restored before Gradle starts |
+| `sim` (android) | v5, plus task outputs in a separate store that is never cleaned per job, plus project state (`build-logic` outputs, `src/*/generated`) restored before Gradle starts, keyed by build-logic inputs and kernel release |
 | `v5rc` (spring) | v5, plus the separate task output store |
 
 ## Scenarios

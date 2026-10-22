@@ -11,6 +11,8 @@ Every provider is observed from outside only:
 
 No provider code is unpacked or modified.
 
+The harness was built with AI assistance (Claude Opus 5.5), and its results were verified with Claude Fable 5.1.
+
 ## Suites
 
 | Suite | Workflow | Build | Gradle calls |

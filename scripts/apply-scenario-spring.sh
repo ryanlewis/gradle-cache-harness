@@ -4,11 +4,20 @@
 #   buildfile   comment added to server/build.gradle
 #   depbump     one library version changed in dependencies.gradle
 #   srcedit     a private method added to one Java class in core, different on every run
+# A "+conv" suffix (e.g. warm+conv) also applies build conventions: parallel execution and configuration cache.
 set -euo pipefail
 
 scenario="$1"
 dir="$2"
 run="${3:-0}"
+
+case "$scenario" in
+  *+conv)
+    scenario="${scenario%+conv}"
+    printf '\norg.gradle.parallel=true\norg.gradle.configuration-cache=true\norg.gradle.configuration-cache.problems=warn\n' >> "$dir/gradle.properties"
+    echo "conventions applied"
+    ;;
+esac
 
 case "$scenario" in
   cold | warm) ;;

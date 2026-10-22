@@ -4,7 +4,8 @@
 #   buildfile   comment added to server/build.gradle
 #   depbump     one library version changed in dependencies.gradle
 #   srcedit     an unused constant added to one Java class in core, different on every run
-# A "+conv" suffix (e.g. warm+conv) also applies build conventions: parallel execution and configuration cache.
+# A "+conv" suffix (e.g. warm+conv) also turns on parallel execution.
+# The configuration cache is left off: Spotless 6.25's Groovy extension can't be serialised, so this build fails to load it.
 set -euo pipefail
 
 scenario="$1"
@@ -14,7 +15,7 @@ run="${3:-0}"
 case "$scenario" in
   *+conv)
     scenario="${scenario%+conv}"
-    printf '\norg.gradle.parallel=true\norg.gradle.configuration-cache=true\norg.gradle.configuration-cache.problems=warn\n' >> "$dir/gradle.properties"
+    printf '\norg.gradle.parallel=true\n' >> "$dir/gradle.properties"
     echo "conventions applied"
     ;;
 esac

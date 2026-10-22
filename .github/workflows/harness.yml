@@ -23,10 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: [enhanced, basic, v5]
-    env:
-      # Keeps the providers' cache entries apart where the provider honours it
-      GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: ${{ matrix.provider }}-
+        provider: [enhanced, basic, v5, sim]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -48,8 +45,22 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # A cold run bumps the epoch, which gives every provider a fresh key space without deleting entries
+      - name: Read scenario
+        run: |
+          read -r s n e < scenario
+          e="${e:-0}"
+          {
+            echo "SCENARIO=$s"
+            echo "RUN=$n"
+            echo "CACHE_EPOCH=$e"
+            echo "GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX=android-e$e-${{ matrix.provider }}-"
+          } >> "$GITHUB_ENV"
+          # Basic keys on build files only; this file puts the suite and epoch into its key
+          mkdir -p epoch && echo "suite=android epoch=$e" > epoch/versions.properties
+
       - name: Apply scenario
-        run: scripts/apply-scenario.sh "$(cut -d' ' -f1 scenario)" nia "$(cut -d' ' -f2 scenario)"
+        run: scripts/apply-scenario.sh "$SCENARIO" nia "$RUN"
 
       - name: Setup Gradle (v6 enhanced)
         if: matrix.provider == 'enhanced'
@@ -65,10 +76,42 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Setup Gradle (v5)
-        if: matrix.provider == 'v5'
+        if: matrix.provider == 'v5' || matrix.provider == 'sim'
         uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
         with:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          gradle-home-cache-excludes: ${{ matrix.provider == 'sim' && 'caches/build-cache-1' || '' }}
+
+      # sim: a rough model of the target design on top of v5.
+      # Task outputs go to a separate store that is never cleaned per job, standing in for a remote build cache.
+      - name: Restore task output store (sim)
+        if: matrix.provider == 'sim'
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/task-store
+          key: android-task-store-e${{ env.CACHE_EPOCH }}-${{ github.sha }}
+          restore-keys: android-task-store-e${{ env.CACHE_EPOCH }}-
+
+      # The included build's outputs, so the first Gradle call can pass the configuration cache fingerprint check
+      - name: Restore build-logic outputs (sim)
+        if: matrix.provider == 'sim'
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            nia/build-logic/convention/build
+            nia/build-logic/.gradle
+          key: android-build-logic-e${{ env.CACHE_EPOCH }}-${{ env.ImageVersion }}-${{ hashFiles('nia/build-logic/**/*.kts', 'nia/build-logic/**/src/**', 'nia/gradle/libs.versions.toml', 'nia/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Point the build cache at the task output store (sim)
+        if: matrix.provider == 'sim'
+        run: |
+          mkdir -p ~/.gradle/init.d /tmp/task-store
+          cat > ~/.gradle/init.d/task-store.init.gradle <<'GRADLE'
+          beforeSettings { settings ->
+              settings.buildCache { local { directory = new File('/tmp/task-store') } }
+          }
+          GRADLE
+          du -sh /tmp/task-store
 
       - name: Snapshot after restore
         run: |

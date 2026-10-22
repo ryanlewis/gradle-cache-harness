@@ -21,7 +21,7 @@ read -r _ last epoch < "$file"
 epoch="${epoch:-0}"
 n=$((last + 1))
 
-if [ "$scenario" = cold ]; then
+if [ "${scenario%+conv}" = cold ]; then
   epoch=$((epoch + 1))
   # Keep the repository under the Actions cache limit: drop entries nobody has used for 90 minutes
   cutoff=$(date -u -v-90M +%FT%TZ 2>/dev/null || date -u -d '90 minutes ago' +%FT%TZ)

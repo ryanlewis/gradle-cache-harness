@@ -49,7 +49,7 @@ jobs:
           java-version: 21
 
       - name: Apply scenario
-        run: scripts/apply-scenario.sh "$(cut -d' ' -f1 scenario)" nia
+        run: scripts/apply-scenario.sh "$(cut -d' ' -f1 scenario)" nia "$(cut -d' ' -f2 scenario)"
 
       - name: Setup Gradle (v6 enhanced)
         if: matrix.provider == 'enhanced'
@@ -71,21 +71,35 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Snapshot after restore
-        run: scripts/snapshot.sh after-restore
+        run: |
+          scripts/snapshot.sh after-restore
+          scripts/delta.sh record
 
       - name: CI Gradle properties
         run: cp nia/.github/ci-gradle.properties ~/.gradle/gradle.properties
 
       - name: Configure
         working-directory: nia
-        run: ./gradlew help --console=plain
+        run: ./gradlew help --console=plain -Dorg.gradle.internal.operations.trace=/tmp/optrace/configure
 
       - name: Build
         working-directory: nia
-        run: ./gradlew :app:assembleDemoDebug -PminifyWithR8=false --console=plain
+        run: ./gradlew :app:assembleDemoDebug -PminifyWithR8=false --console=plain -Dorg.gradle.internal.operations.trace=/tmp/optrace/build
 
       - name: Snapshot after build
-        run: scripts/snapshot.sh after-build
+        run: |
+          scripts/snapshot.sh after-build
+          scripts/delta.sh compare
+
+      - name: Upload build operation traces
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: optrace-${{ matrix.provider }}
+          path: /tmp/optrace/
+          compression-level: 9
+          retention-days: 14
+          if-no-files-found: warn
 
   caches:
     needs: build

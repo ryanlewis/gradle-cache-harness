@@ -101,8 +101,9 @@ jobs:
           path: |
             nia/build-logic/convention/build
             nia/build-logic/.gradle
-            nia/app/src/demoRelease/generated
-          key: android-project-state-e${{ env.CACHE_EPOCH }}-${{ env.ImageVersion }}-${{ hashFiles('nia/build-logic/**/*.kts', 'nia/build-logic/**/src/**', 'nia/gradle/libs.versions.toml', 'nia/gradle/wrapper/gradle-wrapper.properties') }}
+            nia/*/src/*/generated
+            nia/*/*/src/*/generated
+          key: android-project-state2-e${{ env.CACHE_EPOCH }}-${{ env.ImageVersion }}-${{ hashFiles('nia/build-logic/**/*.kts', 'nia/build-logic/**/src/**', 'nia/gradle/libs.versions.toml', 'nia/gradle/wrapper/gradle-wrapper.properties') }}
 
       - name: Point the build cache at the task output store (sim)
         if: matrix.provider == 'sim'

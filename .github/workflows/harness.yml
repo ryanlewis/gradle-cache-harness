@@ -88,7 +88,7 @@ jobs:
       # Task outputs go to a separate store that is never cleaned per job, standing in for a remote build cache.
       - name: Restore task output store (sim)
         if: matrix.provider == 'sim'
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/task-store
           key: android-task-store-e${{ env.CACHE_EPOCH }}-${{ github.sha }}
@@ -98,7 +98,7 @@ jobs:
       # outputs and a directory the build generates inside the source tree
       - name: Restore build-logic outputs (sim)
         if: matrix.provider == 'sim'
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             nia/build-logic/convention/build
